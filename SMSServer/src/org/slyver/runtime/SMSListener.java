@@ -15,6 +15,8 @@
 // 4) Setup callback notifications.
 // 5) Run
 
+package org.slyver.runtime;
+
 import java.awt.Color;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -144,48 +146,13 @@ public class SMSListener
                         if (msgType == MessageTypes.INBOUND) System.out.println(">>> New Inbound message detected from Gateway: " + gateway.getGatewayId());
                         else if (msgType == MessageTypes.STATUSREPORT) System.out.println(">>> New Inbound Status Report message detected from Gateway: " + gateway.getGatewayId());
                         
-                        String[] stemp;
-                        String delimiter = " ";
-                        
-                        Date date = new Date(); 
-                        Calendar calendar = GregorianCalendar.getInstance();
-                        calendar.setTime(date);
-                        
-                        DBMain result = new DBMain();
-                        
-                        stemp = msg.getText().split(delimiter);                        
-                        
-                        ResultSet rs = result.DBQuery("SELECT * FROM ALUMNOS WHERE CODIGO = '"+stemp[1]+"'");
-                        
-                        if(rs.isBeforeFirst()){
-                        
-                              
-                            ResultSet rsv = result.DBQuery("SELECT * FROM VOTES WHERE CODIGO = '"+stemp[1]+"'");
-                            
-                            if(rsv.isBeforeFirst()){
-
-                                VotaSMS.activitiesFeed.setText("Intento de voto duplicado para el codigo "+stemp[1]+"");
-
-                            }else{
-                                   result.DBUpdate("INSERT INTO VOTES (LISTA, CODIGO, CAMPANIA, HORA) VALUES ('"+stemp[0]+"', '"+stemp[1]+"', "+VotaSMS.Campaing+",'"+calendar.get(Calendar.HOUR)+":"+calendar.get(Calendar.MINUTE)+":00')");
-                            }
-                                
-                         }else{
-                             VotaSMS.activitiesFeed.setText("Codigo no existe: "+stemp[1]+"");
-                             System.out.println("Codigo no existe: "+stemp[1]+"");
-                         }
+                        System.out.println(msg.getSmscNumber());
+                        System.out.println(msg.getText());
+                        System.out.println(msg.getDate());
                         //System.out.println(msg.getText());
                         gateway.deleteMessage(msg);
-                        VotaSMS.pastel();
-                    } catch (SQLException ex) {
-                        Logger.getLogger(SMSListener.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (TimeoutException ex) {
-                        Logger.getLogger(SMSListener.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (GatewayException ex) {
-                        Logger.getLogger(SMSListener.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (IOException ex) {
-                        Logger.getLogger(SMSListener.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (InterruptedException ex) {
+                        
+                    } catch (TimeoutException | GatewayException | IOException | InterruptedException ex) {
                         Logger.getLogger(SMSListener.class.getName()).log(Level.SEVERE, null, ex);
                     }
 		}
