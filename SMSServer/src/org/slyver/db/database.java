@@ -10,6 +10,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 
 /**
  *
@@ -23,7 +24,7 @@ public class database {
     public static String sql;
     
     private final String url = "jdbc:sqlserver://";
-    private final String serverName= "mail.gruamazonas.com";
+    private final String serverName= "128.128.0.18";
     private final String portNumber = "1433";
     private final String databaseName= "SMSApp";
     private final String userName = "sa";
@@ -74,6 +75,13 @@ public class database {
         //System.out.println(msjs[0][0]);
         return msjs;
         
+    }
+     
+    public void setData(Long OriginNum, String  msg, LocalDate msgdate) throws SQLException{
+        sql = "INSERT INTO SMSRECEIVER (NUMBER,SMS,DATE) VALUES ("+OriginNum+",'"+msg+"','"+msgdate+"')" ;
+        System.out.println(sql);
+        statement = dbcon.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE);
+        statement.executeUpdate(sql);
     }
      
     public void setEstado(int id, String response) throws SQLException{

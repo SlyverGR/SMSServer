@@ -12,10 +12,20 @@ package org.slyver.runtime;
 public class Iniciador {
     	public static void main(String args[])
 	{	
-           SendMessage app = new SendMessage();
+           //SendMessage app = new SendMessage();
+		//try
+	//	{
+          //          app.doIt();
+	//	}
+	//	catch (Exception e)
+	//	{
+         //           e.printStackTrace();
+	//	}
+                
+            SMSListener appR = new SMSListener();
 		try
 		{
-                    app.doIt();
+                    appR.doIt();
 		}
 		catch (Exception e)
 		{

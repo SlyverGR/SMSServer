@@ -17,20 +17,22 @@
 
 package org.slyver.runtime;
 
-import java.awt.Color;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.slyver.db.database;
 import org.smslib.AGateway;
 import org.smslib.AGateway.GatewayStatuses;
 import org.smslib.AGateway.Protocols;
@@ -39,10 +41,12 @@ import org.smslib.ICallNotification;
 import org.smslib.IGatewayStatusNotification;
 import org.smslib.IInboundMessageNotification;
 import org.smslib.IOrphanedMessageNotification;
+import org.smslib.IOutboundMessageNotification;
 import org.smslib.InboundMessage;
 import org.smslib.InboundMessage.MessageClasses;
 import org.smslib.Library;
 import org.smslib.Message.MessageTypes;
+import org.smslib.OutboundMessage;
 import org.smslib.Service;
 import org.smslib.TimeoutException;
 import org.smslib.modem.SerialModemGateway;
@@ -56,12 +60,15 @@ public class SMSListener
         String usbcom;
         String usbmark;
         String usbmodel;
+        OutboundMessage msg;
+        List<InboundMessage> msgList;
+        
     
 	public void doIt() throws Exception
 	{
                 
             // Define a list which will hold the read messages.
-		List<InboundMessage> msgList;
+		
 		// Create the notification callback method for inbound & status report
 		// messages.
 		InboundNotification inboundNotification = new InboundNotification();
@@ -116,45 +123,94 @@ public class SMSListener
 			// Read Messages. The reading is done via the Service object and
 			// affects all Gateway objects defined. This can also be more directed to a specific
 			// Gateway - look the JavaDocs for information on the Service method calls.
-			msgList = new ArrayList<InboundMessage>();
-			Service.getInstance().readMessages(msgList, MessageClasses.UNREAD);
-			for (InboundMessage msg : msgList){
+			//msgList = new ArrayList<InboundMessage>();
+			//Service.getInstance().readMessages(msgList, MessageClasses.UNREAD);
+			//for (InboundMessage msg : msgList){
                             //System.out.println(msg.getText());
                             //IndexCounter = IndexCounter + 1;
-                        }
+                        //}
 			// Sleep now. Emulate real world situation and give a chance to the notifications
 			// methods to be called in the event of message or voice call reception.
-			System.out.println("Now Sleeping - Hit <enter> to stop service.");
-			System.in.read();
-			System.in.read();
+                        
+                        ScheduledExecutorService exec = Executors.newSingleThreadScheduledExecutor();
+                        exec.scheduleAtFixedRate(new Runnable() {
+                      @Override
+                      public void run() {
+                          try {
+                              database msjs = new database();
+                              
+                              msgList = new ArrayList<InboundMessage>();
+                                  Service.getInstance().readMessages(msgList, MessageClasses.ALL);
+                                  for (InboundMessage msgR : msgList){
+                                    System.out.println(msgR.getOriginator());
+                                    System.out.println(msgR.getText());
+                                    System.out.println(msgR.getDate());
+                                    
+                                    String dateF = new SimpleDateFormat("MM/dd/yyyy").format(msgR.getDate());
+                                    
+                                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy", Locale.ENGLISH);
+                                    
+                                    LocalDate datesms = LocalDate.parse(dateF, formatter);
+                                    
+                                    msjs.setData(Long.valueOf(msgR.getOriginator()).longValue(), msgR.getText(), datesms);
+                                    
+                                    
+                                    gateway.deleteMessage(msgR);
+                                  }
+                                  
+
+                              if(!"NULL".equals(msjs.getData()[0][0])){
+
+                                  //System.out.println(msjs.getData()[0][1]+","+ msjs.getData()[0][2]);
+
+                                  msg = new OutboundMessage(msjs.getData()[0][1].trim(), msjs.getData()[0][2].trim());
+
+                                  msg.setStatusReport(true);
+                                  Service.getInstance().sendMessage(msg);
+                                  
+                                  System.out.println(msg);
+                                  String smscode = msg.getMessageStatus().toString();
+
+                                  msjs.setEstado(Integer.parseInt(msjs.getData()[0][0].trim()),smscode);
+
+                              }else{
+                                  System.out.println("No hay mensajes pendientes");
+                                  //Service.getInstance().stopService();
+                              } } catch (SQLException | ClassNotFoundException | TimeoutException | GatewayException | IOException | InterruptedException ex) {
+                              Logger.getLogger(SendMessage.class.getName()).log(Level.SEVERE, null, ex);
+                          }
+                      }
+                    }, 0, 10, TimeUnit.SECONDS);
+                        
+                        
+			//System.out.println("Now Sleeping - Hit <enter> to stop service.");
+			//System.in.read();
+			//System.in.read();
 		}
 		catch (Exception e)
 		{
 			e.printStackTrace();
 		}
-		finally
-		{
-			Service.getInstance().stopService();
-		}
+		
 	}
 
 	public class InboundNotification implements IInboundMessageNotification 
 	{
 		public void process(AGateway gateway, MessageTypes msgType, InboundMessage msg) 
 		{
-                    try {
-                        if (msgType == MessageTypes.INBOUND) System.out.println(">>> New Inbound message detected from Gateway: " + gateway.getGatewayId());
-                        else if (msgType == MessageTypes.STATUSREPORT) System.out.println(">>> New Inbound Status Report message detected from Gateway: " + gateway.getGatewayId());
+                    if (msgType == MessageTypes.INBOUND) System.out.println(">>> New Inbound message detected from Gateway: " + gateway.getGatewayId());
+                    else if (msgType == MessageTypes.STATUSREPORT) System.out.println(">>> New Inbound Status Report message detected from Gateway: " + gateway.getGatewayId());
+		}
+	}
+        
+        public class OutboundNotification implements IOutboundMessageNotification
+	{
+		public void process(AGateway gateway, OutboundMessage msg)
+		{
+			System.out.println("Outbound handler called from Gateway: " + gateway.getGatewayId());
+			System.out.println(msg);
                         
-                        System.out.println(msg.getSmscNumber());
-                        System.out.println(msg.getText());
-                        System.out.println(msg.getDate());
-                        //System.out.println(msg.getText());
-                        gateway.deleteMessage(msg);
-                        
-                    } catch (TimeoutException | GatewayException | IOException | InterruptedException ex) {
-                        Logger.getLogger(SMSListener.class.getName()).log(Level.SEVERE, null, ex);
-                    }
+
 		}
 	}
 
